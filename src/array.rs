@@ -117,7 +117,7 @@ impl Array {
         let mut _t = txn.transaction()?;
         let mut t = _t.as_mut().unwrap().as_mut();
         let d1: Doc = doc.extract().unwrap();
-        let d2: _Doc = d1.doc;
+        let d2: _Doc = (*d1.doc).clone();
         let doc_ref = self.array.insert(&mut t, index, d2);
         doc_ref.load(t);
         Ok(())

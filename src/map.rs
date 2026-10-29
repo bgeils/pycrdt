@@ -98,7 +98,7 @@ impl Map {
         let d1: Doc = doc
             .extract()
             .map_err(|_| PyTypeError::new_err("Expected Doc object"))?;
-        let d2: _Doc = d1.doc;
+        let d2: _Doc = (*d1.doc).clone();
         let doc_ref = self.map.insert(&mut t, key, d2);
         doc_ref.load(t);
         Ok(())

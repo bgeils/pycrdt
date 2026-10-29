@@ -21,12 +21,22 @@ use crate::xml::XmlFragment;
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Doc {
-    pub doc: _Doc,
+    pub doc: std::mem::ManuallyDrop<_Doc>,
+}
+
+impl Drop for Doc {
+    fn drop(&mut self) {
+        // SAFETY: taken once, here; the field is never used again.
+        let doc = unsafe { std::mem::ManuallyDrop::take(&mut self.doc) };
+        // Freeing the last handle frees the whole block store: pure Rust, so
+        // release the GIL while it runs (a large document takes 100+ ms).
+        Python::attach(|py| py.detach(move || drop(doc)));
+    }
 }
 
 impl Doc {
     pub fn from(doc: _Doc) -> Self {
-        Doc { doc }
+        Doc { doc: std::mem::ManuallyDrop::new(doc) }
     }
     /// Internal: create a new Doc from a Snapshot and an original Doc
     pub fn _from_snapshot_impl(original: &Self, snapshot: &crate::snapshot::Snapshot) -> Self {
@@ -63,7 +73,7 @@ impl Doc {
             }
         }
         drop(txn_orig);
-        Doc { doc: new_doc }
+        Doc::from(new_doc)
     }
 }
 
@@ -102,7 +112,7 @@ impl Doc {
             options.guid = Arc::<str>::from(guid);
         }
         let doc = _Doc::with_options(options);
-        Ok(Doc { doc })
+        Ok(Doc::from(doc))
     }
 
     #[staticmethod]
