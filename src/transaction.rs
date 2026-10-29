@@ -114,7 +114,13 @@ impl Transaction {
 #[pymethods]
 impl Transaction {
     pub fn commit(&mut self, py: Python<'_>) -> PyResult<()> {
-        self.transaction()?.as_mut().unwrap().as_mut().commit();
+        {
+            let mut guard = self.transaction()?;
+            let t = guard.as_mut().unwrap().as_mut();
+            // Observer callbacks re-acquire the GIL themselves (Python::attach),
+            // and raised exceptions stay on this thread's state for PyErr::take.
+            py.detach(move || t.commit());
+        }
         // Check if any Python exception was raised during commit (e.g., in callbacks)
         if let Some(err) = pyo3::PyErr::take(py) {
             return Err(err);
